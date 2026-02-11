@@ -11,16 +11,16 @@ Minimal self-hosted REST API for exposing Reportheld domain capabilities to n8n,
 docker-compose up --build
 ```
 
-- API: **http://localhost:3000**
-- Health: **http://localhost:3000/health**
+- API: **http://localhost:8000**
+- Health: **http://localhost:8000/health**
 - MongoDB runs only inside Docker; no local MongoDB install.
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Liveness/readiness |
-| POST | `/api/v1/users` | Create user (n8n webhook target) |
+| Method | Path            | Description                      |
+| ------ | --------------- | -------------------------------- |
+| GET    | `/health`       | Liveness/readiness               |
+| POST   | `/api/v1/users` | Create user (n8n webhook target) |
 
 ### POST /api/v1/users
 
@@ -60,7 +60,7 @@ docker-compose up --build
 **Create user:**
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users \
+curl -X POST http://localhost:8000/api/v1/users \
   -H "Content-Type: application/json" \
   -d '{"name":"Jane Doe","email":"jane@example.com","role":"inspector"}'
 ```
@@ -68,13 +68,13 @@ curl -X POST http://localhost:3000/api/v1/users \
 **Health check:**
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:8000/health
 ```
 
 **Validation error (missing field):**
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users \
+curl -X POST http://localhost:8000/api/v1/users \
   -H "Content-Type: application/json" \
   -d '{"name":"Jane","email":"jane@example.com"}'
 ```
@@ -82,7 +82,7 @@ curl -X POST http://localhost:3000/api/v1/users \
 **Duplicate email (second request with same email):**
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/users \
+curl -X POST http://localhost:8000/api/v1/users \
   -H "Content-Type: application/json" \
   -d '{"name":"Jane Doe","email":"jane@example.com","role":"inspector"}'
 ```
@@ -91,9 +91,9 @@ curl -X POST http://localhost:3000/api/v1/users \
 
 Use this in an n8n workflow (e.g. after a Webhook node):
 
-- **Method:** POST  
-- **URL:** `http://api:3000/api/v1/users` (when n8n runs in same Docker network as this API)  
-  - From host machine: `http://localhost:3000/api/v1/users`
+- **Method:** POST
+- **URL:** `http://api:8000/api/v1/users` (when n8n runs in same Docker network as this API)
+  - From host machine: `http://localhost:8000/api/v1/users`
 - **Body Content Type:** JSON
 - **Specify Body:** Using JSON
 - **JSON Body:**
@@ -130,7 +130,7 @@ docker-compose.yml — api + mongo, healthcheck, volume
 Copy `.env.example` to `.env` and adjust if needed. Defaults:
 
 - `MONGO_URI=mongodb://mongo:27017/reportheld` (use service name in Docker)
-- `PORT=3000`
+- `PORT=8000`
 
 **No secrets in Git.** Override via `.env` or environment.
 
