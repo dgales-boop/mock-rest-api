@@ -2,68 +2,40 @@
 
 Minimal self-hosted REST API for exposing Reportheld domain capabilities to n8n, AI tooling, and internal integrations. **Week 1 proof-of-concept** — not a full Reportheld API.
 
-## Quick Start (≈30 min handover)
+## Quick Start
 
-**Prerequisites:** Docker and Docker Compose installed. No local Node or MongoDB required.
+**Prerequisites:** Node.js (≥18). No database required; all data is hardcoded.
+
+1. **Install and run the API:**
 
 ```bash
-# Clone (or unpack) the project, then:
-docker-compose up --build
+npm install
+cp .env.example .env   # optional
+npm run dev
 ```
 
-- API: **http://localhost:8000**
+- API: **http://localhost:8000** (or the port in `.env`)
 - Health: **http://localhost:8000/health**
-- MongoDB runs only inside Docker; no local MongoDB install.
+- **Sites** (hardcoded): **GET /api/v1/sites**
 
 ## Endpoints
 
-| Method | Path            | Description                      |
-| ------ | --------------- | -------------------------------- |
-| GET    | `/health`       | Liveness/readiness               |
-| POST   | `/api/v1/users` | Create user (n8n webhook target) |
+| Method | Path                     | Description                              |
+| ------ | ------------------------ | ---------------------------------------- |
+| GET    | `/health`                | Liveness/readiness                       |
+| GET    | `/api/v1/sites`          | List all sites (level1 + level2, hardcoded) |
+| GET    | `/api/v1/sites/:id`      | Get one site (level1) by ID, e.g. `site-1` |
+| GET    | `/api/v1/sites/level2/:id` | Get one level2 item by ID, e.g. `BT-123450L` |
 
-### POST /api/v1/users
+### GET /api/v1/sites (hardcoded)
 
-**Request (JSON):**
+Returns all level1 sites with nested level2. No database required.
 
-```json
-{
-  "name": "Jane Doe",
-  "email": "jane@example.com",
-  "role": "inspector"
-}
-```
-
-**Validation:**
-
-- `name`, `email`, `role` — required
-- `email` — valid email format
-- Only these three fields allowed; unknown fields are rejected
-
-**Success (201):**
-
-```json
-{
-  "id": "674a1b2c3d4e5f6789012345",
-  "message": "User created successfully"
-}
-```
-
-**Errors:**
-
-- **400** — Validation failed (missing/invalid fields or unknown fields)
-- **409** — Duplicate email (unique index on `email`)
-- **500** — Internal error
+- **GET /api/v1/sites** — full JSON `{ "level1": [ ... ] }`
+- **GET /api/v1/sites/site-1** — single site by level1 id (404 if not found)
+- **GET /api/v1/sites/level2/BT-123450L** — single level2 item by id (404 if not found)
 
 ## cURL Examples
-
-**Create user:**
-
-```bash
-curl -X POST http://localhost:8000/api/v1/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Jane Doe","email":"jane@example.com","role":"inspector"}'
-```
 
 **Health check:**
 
@@ -71,57 +43,46 @@ curl -X POST http://localhost:8000/api/v1/users \
 curl http://localhost:8000/health
 ```
 
-**Validation error (missing field):**
+**List all sites (hardcoded):**
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Jane","email":"jane@example.com"}'
+curl http://localhost:8000/api/v1/sites
 ```
 
-**Duplicate email (second request with same email):**
+**Get site by ID:**
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Jane Doe","email":"jane@example.com","role":"inspector"}'
+curl http://localhost:8000/api/v1/sites/site-1
 ```
 
-## n8n HTTP Request Node
+**Get level2 item by ID:**
 
-Use this in an n8n workflow (e.g. after a Webhook node):
-
-- **Method:** POST
-- **URL:** `http://api:8000/api/v1/users` (when n8n runs in same Docker network as this API)
-  - From host machine: `http://localhost:8000/api/v1/users`
-- **Body Content Type:** JSON
-- **Specify Body:** Using JSON
-- **JSON Body:**
-
-```json
-{
-  "name": "{{ $json.name }}",
-  "email": "{{ $json.email }}",
-  "role": "{{ $json.role }}"
-}
+```bash
+curl http://localhost:8000/api/v1/sites/level2/BT-123450L
 ```
 
-If the webhook sends `name`, `email`, and `role` directly, you can pass `$json` (or the relevant subset) as the body. Ensure only `name`, `email`, and `role` are sent; extra fields will be rejected.
+## What n8n needs to do to connect and use this API
+
+With the API running locally (`npm run dev`), n8n on the same machine can call:
+
+- **GET** `http://localhost:8000/api/v1/sites` — list all sites (hardcoded)
+- **GET** `http://localhost:8000/api/v1/sites/site-1` — get one site by id
+- **GET** `http://localhost:8000/api/v1/sites/level2/BT-123450L` — get one level2 item by id
+
+**Example workflow:** Trigger → HTTP Request node (GET to one of the URLs above).
 
 ## Project Structure
 
 ```
 /src
-  /config      — app config, Mongo connection
-  /models      — Mongoose schemas (User)
-  /services    — business logic (user creation, duplicate handling)
+  /config      — app config (port, env)
+  /data        — hardcoded sites data
+  /services    — business logic (sites)
   /controllers — HTTP handlers (delegate to services)
   /routes      — versioned routes (/api/v1)
-  /middlewares — validation, error handling
+  /middlewares — error handling
   app.ts       — Express app (routes, middleware)
-  server.ts    — bootstrap (Mongo, listen)
-Dockerfile     — multi-stage build
-docker-compose.yml — api + mongo, healthcheck, volume
+  server.ts    — bootstrap (listen)
 .env.example   — env template (no secrets)
 ```
 
@@ -129,17 +90,15 @@ docker-compose.yml — api + mongo, healthcheck, volume
 
 Copy `.env.example` to `.env` and adjust if needed. Defaults:
 
-- `MONGO_URI=mongodb://mongo:27017/reportheld` (use service name in Docker)
 - `PORT=8000`
+- `NODE_ENV=development`
 
 **No secrets in Git.** Override via `.env` or environment.
 
 ## Assumptions
 
-- Single database (reportheld DB); no multi-tenant isolation in this prototype.
+- All data is hardcoded (no database).
 - **No authentication/authorization** — suitable only for trusted/internal use (e.g. internal n8n).
-- Role is stored as provided; no role enum or modification in v1.
-- MongoDB is the only persistence; no caching or event bus.
 
 ## What Is Intentionally NOT Implemented
 
@@ -152,11 +111,10 @@ Copy `.env.example` to `.env` and adjust if needed. Defaults:
 
 These are planned for a later phase (e.g. Week 2).
 
-## Local Development (optional)
+## Local Development
 
 ```bash
 npm install
-# Ensure MongoDB is reachable (e.g. docker-compose up mongo only, or use MONGO_URI)
 npm run dev
 ```
 
@@ -169,7 +127,7 @@ npm start
 
 ## Architecture Summary
 
-- **Why user creation as first capability:** Demonstrates external automation (n8n) creating a domain entity in a controlled way; validates API surface and Docker setup.
-- **Why safe for v1:** Single endpoint, strict validation, unique email, no PII beyond what’s needed; designed to add auth and hardening next.
-- **Risks (known):** Duplicate submissions (same payload twice → second returns 409); no auth (abuse if exposed); no rate limiting. Mitigation: keep network internal and add auth/rate limiting in Week 2.
-- **Evolution (e.g. Week 2):** JWT auth, tenant isolation, idempotency keys, rate limiting, request logging, audit trail.
+- **Sites (hardcoded):** Exposes level1/level2 site data via GET; no database; suitable for n8n and internal integrations.
+- **No authentication** — Suitable only for trusted/internal use.
+
+- **Evolution:** Add auth, rate limiting, and persistence when needed.
