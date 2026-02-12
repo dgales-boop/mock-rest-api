@@ -144,18 +144,38 @@ Copy `.env.example` to `.env` and adjust if needed. Defaults:
 ## Assumptions
 
 - All data is hardcoded (no database).
-- **No authentication/authorization** — suitable only for trusted/internal use (e.g. internal n8n).
+- **Optional API key** — when `API_KEY` is set, all `/api/v1/*` require it; suitable for trusted/internal or simple shared-secret use (e.g. n8n). No roles or tenant-aware auth yet.
 
-## What Is Intentionally NOT Implemented
+## What Is Intentionally NOT Implemented (v1)
 
-- Authentication / authorization
-- Role modification or deletion
-- Multi-tenant enforcement
-- Idempotency keys
-- Rate limiting
-- Request logging / audit trail
+- Role-based authorization (only single API key)
+- Tenant isolation / multi-tenant enforcement
+- Write/update/delete operations (read-only)
+- Idempotency keys, rate limiting, request logging / audit trail
 
-These are planned for a later phase (e.g. Week 2).
+Planned for a later phase (e.g. Week 2).
+
+## Decision log & handover (Week 1)
+
+**What we chose to expose and why**
+
+- **Sites (level1 → level2 → protocols):** Reportheld’s structure of sites, items under sites, and protocols under items. Exposed as GET-only so n8n/AI can read hierarchy and pick ids without write risk.
+- **Versioning:** `/api/v1` from day one so we can add v2 later without breaking consumers.
+- **Auth:** Optional API key (`X-API-Key` or `Authorization: Bearer`) so the same code runs unauthenticated locally and key-protected when deployed (e.g. Render). No cloud lock-in.
+
+**What we explicitly did not do in v1**
+
+- No tenant boundaries in the API (single global data). Next team should add tenant context (e.g. header or path) and enforce it.
+- No writes: no POST/PUT/DELETE. Reduces risk; add with clear rules and auth later.
+- No Docker in repo currently (run with `npm run dev` or deploy to Render). Docker can be re-added for strict on-prem parity.
+
+**Open questions for next team**
+
+- Where does real sites/protocols data live (DB/service)? Replace hardcoded `src/data/sites.ts` with that.
+- Tenant id: header vs path vs JWT claim?
+- Rate limits and audit logging before opening to more consumers.
+
+**Handover:** Clone repo → `npm install` → `npm run dev` → hit `/health` and `/api/v1/sites` (with `X-API-Key` if `API_KEY` is set). See **Deploy to Render** and **docs/DEPLOY_RENDER.md** for public deploy. Assume no prior context; this README is the entry point.
 
 ## Local Development
 
